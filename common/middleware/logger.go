@@ -4,10 +4,8 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"go-admin/app/admin/service/dto"
 	"go-admin/common"
-	gaConfig "go-admin/config"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -18,7 +16,6 @@ import (
 	"github.com/go-admin-team/go-admin-core/sdk"
 	"github.com/go-admin-team/go-admin-core/sdk/api"
 	"github.com/go-admin-team/go-admin-core/sdk/config"
-	"github.com/go-admin-team/go-admin-core/sdk/pkg"
 	"github.com/go-admin-team/go-admin-core/sdk/pkg/jwtauth/user"
 
 	"go-admin/common/global"
@@ -94,7 +91,9 @@ func LoggerToFile() gin.HandlerFunc {
 			"uri":         reqUri,
 		}
 		log.WithFields(logData).Info()
-
+		defer func() {
+			log.Fields(map[string]interface{}{})
+		}()
 		if c.Request.Method != "OPTIONS" && config.LoggerConfig.EnabledDB && statusCode != 404 {
 			SetDBOperLog(c, clientIP, statusCode, reqUri, reqMethod, latencyTime, body, result, statusBus)
 		}
@@ -109,8 +108,7 @@ func SetDBOperLog(c *gin.Context, clientIP string, statusCode int, reqUri string
 	l["_fullPath"] = c.FullPath()
 	l["operUrl"] = reqUri
 	l["operIp"] = clientIP
-	fmt.Println("gaConfig.ExtConfig.AMap.Key", gaConfig.ExtConfig.AMap.Key)
-	l["operLocation"] = pkg.GetLocation(clientIP, gaConfig.ExtConfig.AMap.Key)
+	l["operLocation"] = "" // pkg.GetLocation(clientIP, gaConfig.ExtConfig.AMap.Key)
 	l["operName"] = user.GetUserName(c)
 	l["requestMethod"] = reqMethod
 	l["operParam"] = body
@@ -130,7 +128,7 @@ func SetDBOperLog(c *gin.Context, clientIP string, statusCode int, reqUri string
 	message, err := sdk.Runtime.GetStreamMessage("", global.OperateLog, l)
 	if err != nil {
 		log.Errorf("GetStreamMessage error, %s", err.Error())
-		//日志报错错误，不中断请求
+		// 日志报错错误，不中断请求
 	} else {
 		err = q.Append(message)
 		if err != nil {

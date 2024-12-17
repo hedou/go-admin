@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"github.com/pkg/errors"
 	"log"
 	"net/http"
 	"os"
@@ -15,7 +16,6 @@ import (
 	"github.com/go-admin-team/go-admin-core/sdk/api"
 	"github.com/go-admin-team/go-admin-core/sdk/config"
 	"github.com/go-admin-team/go-admin-core/sdk/pkg"
-	"github.com/go-admin-team/go-admin-core/sdk/runtime"
 	"github.com/spf13/cobra"
 
 	"go-admin/app/admin/models"
@@ -100,7 +100,7 @@ func run() error {
 	if apiCheck {
 		var routers = sdk.Runtime.GetRouter()
 		q := sdk.Runtime.GetMemoryQueue("")
-		mp := make(map[string]interface{}, 0)
+		mp := make(map[string]interface{})
 		mp["List"] = routers
 		message, err := sdk.Runtime.GetStreamMessage("", global.ApiCheck, mp)
 		if err != nil {
@@ -117,11 +117,11 @@ func run() error {
 	go func() {
 		// 服务连接
 		if config.SslConfig.Enable {
-			if err := srv.ListenAndServeTLS(config.SslConfig.Pem, config.SslConfig.KeyStr); err != nil && err != http.ErrServerClosed {
+			if err := srv.ListenAndServeTLS(config.SslConfig.Pem, config.SslConfig.KeyStr); err != nil && !errors.Is(err, http.ErrServerClosed) {
 				log.Fatal("listen: ", err)
 			}
 		} else {
-			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 				log.Fatal("listen: ", err)
 			}
 		}
@@ -129,14 +129,14 @@ func run() error {
 	fmt.Println(pkg.Red(string(global.LogoContent)))
 	tip()
 	fmt.Println(pkg.Green("Server run at:"))
-	fmt.Printf("-  Local:   http://localhost:%d/ \r\n", config.ApplicationConfig.Port)
-	fmt.Printf("-  Network: http://%s:%d/ \r\n", pkg.GetLocaHonst(), config.ApplicationConfig.Port)
+	fmt.Printf("-  Local:   %s://localhost:%d/ \r\n", "http", config.ApplicationConfig.Port)
+	fmt.Printf("-  Network: %s://%s:%d/ \r\n", "http", pkg.GetLocaHonst(), config.ApplicationConfig.Port)
 	fmt.Println(pkg.Green("Swagger run at:"))
 	fmt.Printf("-  Local:   http://localhost:%d/swagger/admin/index.html \r\n", config.ApplicationConfig.Port)
-	fmt.Printf("-  Network: http://%s:%d/swagger/admin/index.html \r\n", pkg.GetLocaHonst(), config.ApplicationConfig.Port)
+	fmt.Printf("-  Network: %s://%s:%d/swagger/admin/index.html \r\n", "http", pkg.GetLocaHonst(), config.ApplicationConfig.Port)
 	fmt.Printf("%s Enter Control + C Shutdown Server \r\n", pkg.GetCurrentTimeStr())
 	// 等待中断信号以优雅地关闭服务器（设置 5 秒的超时时间）
-	quit := make(chan os.Signal)
+	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt)
 	<-quit
 
@@ -152,7 +152,7 @@ func run() error {
 	return nil
 }
 
-var Router runtime.Router
+//var Router runtime.Router
 
 func tip() {
 	usageStr := `欢迎使用 ` + pkg.Green(`go-admin `+global.Version) + ` 可以使用 ` + pkg.Red(`-h`) + ` 查看命令`
@@ -171,7 +171,7 @@ func initRouter() {
 		r = h.(*gin.Engine)
 	default:
 		log.Fatal("not support other engine")
-		os.Exit(-1)
+		//os.Exit(-1)
 	}
 	if config.SslConfig.Enable {
 		r.Use(handler.TlsHandler())
